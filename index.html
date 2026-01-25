@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Micro Contracts Risk Calculator</title>
+  <style>
+    :root { --bg:#0b0f17; --card:#121a27; --text:#e7eefc; --muted:#93a4c7; --accent:#7aa2ff; --bad:#ff6b6b; --ok:#3ddc97; }
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+    .wrap{max-width:980px;margin:0 auto;padding:18px;}
+    h1{font-size:20px;margin:0 0 10px;}
+    .sub{color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.35;}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px;}
+    @media(min-width:900px){.grid{grid-template-columns:420px 1fr;}}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:14px;box-shadow:0 8px 26px rgba(0,0,0,.28);}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px;}
+    input,select{width:100%;box-sizing:border-box;background:#0e1522;color:var(--text);
+      border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px 11px;font-size:14px;}
+    input:focus,select:focus{outline:2px solid rgba(122,162,255,.35);border-color:rgba(122,162,255,.5);}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+    button{background:var(--accent);color:#07101f;border:0;border-radius:12px;padding:10px 12px;
+      font-weight:700;cursor:pointer;}
+    button.secondary{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.14);}
+    .kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+    .kpi .box{background:#0e1522;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;}
+    .kpi .big{font-size:22px;font-weight:800;margin-top:2px;}
+    .muted{color:var(--muted);font-size:12px;line-height:1.35;}
+    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:10px;}
+    th,td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px;text-align:left;}
+    th{color:var(--muted);font-weight:700;}
+    .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:700;}
+    .pill.ok{background:rgba(61,220,151,.14);color:var(--ok);border:1px solid rgba(61,220,151,.35);}
+    .pill.bad{background:rgba(255,107,107,.14);color:var(--bad);border:1px solid rgba(255,107,107,.35);}
+    .pill.neu{background:rgba(122,162,255,.14);color:var(--accent);border:1px solid rgba(122,162,255,.35);}
+    .foot{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.35;}
+    code{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:8px;}
+    .resolved{margin-top:8px}
+    .shortcutbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .chip{background:#0e1522;border:1px solid rgba(255,255,255,.12);color:var(--text);
+          padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;user-select:none}
+    .chip:hover{border-color:rgba(122,162,255,.45)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Micro Contracts Risk Calculator</h1>
+  <div class="sub">
+    Type the instrument (with suggestions), then enter <b>Entry</b>, <b>Stop</b>, and your <b>$ Risk</b>.
+    It calculates risk per 1 contract and how many contracts you can take (rounded down).
+    <br/>Supported: MES, MNQ, MYM, M2K, MGC (Micro Gold), SIL (Micro Silver), MHG (Micro Copper), MCL (Micro Crude), MNG (Micro Nat Gas).
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <label>Instrument (type to search)</label>
+      <input id="instrument" list="instrumentList" placeholder="Type: gold, silver, sp, nasdaq, crude, natgas…" autocomplete="off" />
+      <datalist id="instrumentList"></datalist>
+
+      <div class="resolved" id="resolved"></div>
+
+      <div class="shortcutbar" id="shortcuts"></div>
+
+      <div class="row">
+        <div>
+          <label>Entry price</label>
+          <input id="entry" type="number" inputmode="decimal" step="any" placeholder="e.g., 20560.25" />
+        </div>
+        <div>
+          <label>Stop loss price</label>
+          <input id="stop" type="number" inputmode="decimal" step="any" placeholder="e.g., 20540.25" />
+        </div>
+      </div>
+
+      <label>Desired $ risk (max loss)</label>
+      <input id="risk" type="number" inputmode="decimal" step="any" placeholder="e.g., 100" />
+
+      <div class="btnrow">
+        <button id="calc">Calculate</button>
+        <button class="secondary" id="swap">Swap Entry/Stop</button>
+        <button class="secondary" id="clear">Clear</button>
+      </div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="muted">Risk per 1 contract</div>
+          <div class="big" id="riskPer">—</div>
+        </div>
+        <div class="box">
+          <div class="muted">Max contracts (rounded down)</div>
+          <div class="big" id="contracts">—</div>
+        </div>
+      </div>
+
+      <div class="foot" id="note"></div>
+    </div>
+
+    <div class="card">
+      <div class="muted">
+        Contract specs used by this calculator (tick size and $ per tick).
+      </div>
+
+      <table id="specTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Tick size</th>
+            <th>$ / tick</th>
+            <th>$ / point (if relevant)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="foot">
+        Math: <code>ticks = |entry - stop| ÷ tickSize</code>, <code>riskPerContract = ticks × tickValue</code>, <code>contracts = floor(risk ÷ riskPerContract)</code>.
+        <br/><span class="pill ok">Conservative</span> If your stop isn't exactly on the tick grid, we round ticks up.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const instruments = [
+    {sym:"MES", name:"Micro E-mini S&P 500", tickSize:0.25, tickValue:1.25, pointValue:5.00},
+    {sym:"MNQ", name:"Micro E-mini Nasdaq-100", tickSize:0.25, tickValue:0.50, pointValue:2.00},
+    {sym:"MYM", name:"Micro E-mini Dow", tickSize:1.0, tickValue:0.50, pointValue:0.50},
+    {sym:"M2K", name:"Micro E-mini Russell 2000", tickSize:0.10, tickValue:0.50, pointValue:5.00},
+
+    {sym:"MGC", name:"Micro Gold", tickSize:0.10, tickValue:1.00, pointValue:null},   // 10 oz * $0.10 = $1
+    {sym:"SIL", name:"Micro Silver", tickSize:0.01, tickValue:10.00, pointValue:null}, // 1000 oz * $0.01 = $10
+    {sym:"MHG", name:"Micro Copper", tickSize:0.0005, tickValue:1.25, pointValue:null},// 2500 lbs * 0.0005 = 1.25
+
+    {sym:"MCL", name:"Micro WTI Crude Oil", tickSize:0.01, tickValue:1.00, pointValue:null}, // $0.01 * 100 bbl = $1
+    {sym:"MNG", name:"Micro Henry Hub Nat Gas", tickSize:0.001, tickValue:1.00, pointValue:null}, // $0.001 * 1000 = $1
+  ];
+
+  // Aliases for fast typing (you can add more anytime)
+  const aliasMap = new Map([
+    // Indices
+    ["sp","MES"], ["es","MES"], ["mes","MES"], ["s&p","MES"], ["sp500","MES"], ["s&p500","MES"], ["sandp","MES"], ["s&p 500","MES"],
+    ["nasdaq","MNQ"], ["nq","MNQ"], ["mnq","MNQ"], ["nas","MNQ"], ["nas100","MNQ"], ["ndx","MNQ"],
+    ["dow","MYM"], ["ym","MYM"], ["mym","MYM"], ["djia","MYM"],
+    ["russell","M2K"], ["rt","M2K"], ["m2k","M2K"], ["r2k","M2K"], ["rut","M2K"],
+
+    // Metals
+    ["gold","MGC"], ["xau","MGC"], ["mgc","MGC"],
+    ["silver","SIL"], ["xag","SIL"], ["sil","SIL"],
+    ["copper","MHG"], ["hg","MHG"], ["mhg","MHG"], ["micro copper","MHG"],
+
+    // Energy
+    ["crude","MCL"], ["oil","MCL"], ["wti","MCL"], ["mcl","MCL"], ["crude oil","MCL"],
+    ["natgas","MNG"], ["natural gas","MNG"], ["gas","MNG"], ["mng","MNG"], ["henry hub","MNG"],
+  ]);
+
+  const favorites = [
+    {label:"GOLD", value:"gold"},
+    {label:"SILVER", value:"silver"},
+    {label:"COPPER", value:"copper"},
+    {label:"SP", value:"sp"},
+    {label:"NQ", value:"nq"},
+    {label:"DOW", value:"dow"},
+    {label:"RUSSELL", value:"russell"},
+    {label:"CRUDE", value:"crude"},
+    {label:"NATGAS", value:"natgas"},
+  ];
+
+  const $ = (id)=>document.getElementById(id);
+
+  function norm(s){
+    return (s||"").toString().trim().toLowerCase().replace(/\s+/g," ");
+  }
+
+  function fmtMoney(x){
+    if (!isFinite(x)) return "—";
+    const abs = Math.abs(x);
+    const digits = abs >= 1000 ? 0 : abs >= 100 ? 1 : 2;
+    return "$" + x.toFixed(digits);
+  }
+  function fmtNum(x){
+    if (!isFinite(x)) return "—";
+    return x.toLocaleString(undefined,{maximumFractionDigits:8});
+  }
+
+  function resolveInstrument(input){
+    const raw = norm(input);
+    if (!raw) return null;
+
+    // If user typed a symbol directly (MES/MNQ/etc.)
+    const symUp = raw.toUpperCase();
+    const direct = instruments.find(x=>x.sym===symUp);
+    if (direct) return direct;
+
+    // Alias match
+    const mappedSym = aliasMap.get(raw);
+    if (mappedSym){
+      return instruments.find(x=>x.sym===mappedSym) || null;
+    }
+
+    // Partial match on name or symbol
+    const partial = instruments.find(x => x.sym.toLowerCase().includes(raw) || x.name.toLowerCase().includes(raw));
+    return partial || null;
+  }
+
+  function updateResolved(){
+    const ins = resolveInstrument($("instrument").value);
+    const box = $("resolved");
+    if (!ins){
+      box.innerHTML = `<span class="pill bad">Not found</span> Type something like <b>gold</b>, <b>silver</b>, <b>sp</b>, <b>nq</b>, <b>crude</b>, <b>natgas</b>, or a symbol like <b>MES</b>.`;
+      return null;
+    }
+    box.innerHTML = `<span class="pill neu">Using</span> <b>${ins.sym}</b> — ${ins.name} · tick ${fmtNum(ins.tickSize)} · ${fmtMoney(ins.tickValue)}/tick`;
+    return ins;
+  }
+
+  function populate(){
+    // datalist suggestions: symbols + common names + aliases
+    const dl = $("instrumentList");
+    const suggestions = new Set();
+    instruments.forEach(ins=>{
+      suggestions.add(ins.sym);
+      suggestions.add(ins.name);
+    });
+    for (const [k,v] of aliasMap.entries()){
+      suggestions.add(k);
+    }
+    Array.from(suggestions).sort().forEach(s=>{
+      const opt=document.createElement("option");
+      opt.value=s;
+      dl.appendChild(opt);
+    });
+
+    // favorites chips
+    const bar = $("shortcuts");
+    favorites.forEach(f=>{
+      const chip=document.createElement("div");
+      chip.className="chip";
+      chip.textContent=f.label;
+      chip.addEventListener("click", ()=>{
+        $("instrument").value = f.value;
+        updateResolved();
+        tryAutoCalc();
+        $("instrument").focus();
+      });
+      bar.appendChild(chip);
+    });
+
+    // specs table
+    const tb = $("specTable").querySelector("tbody");
+    instruments.forEach(ins=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML = `
+        <td><b>${ins.sym}</b></td>
+        <td>${ins.name}</td>
+        <td>${fmtNum(ins.tickSize)}</td>
+        <td>${fmtMoney(ins.tickValue)}</td>
+        <td>${ins.pointValue==null ? "—" : fmtMoney(ins.pointValue)}</td>
+      `;
+      tb.appendChild(tr);
+    });
+
+    // default instrument for speed
+    $("instrument").value = "sp";
+    updateResolved();
+  }
+
+  function tryAutoCalc(){
+    if($("entry").value && $("stop").value && $("risk").value && resolveInstrument($("instrument").value)) calc();
+  }
+
+  function calc(){
+    const ins = updateResolved();
+    const entry = parseFloat($("entry").value);
+    const stop  = parseFloat($("stop").value);
+    const risk  = parseFloat($("risk").value);
+
+    const note = $("note");
+    note.textContent = "";
+    $("riskPer").textContent = "—";
+    $("contracts").textContent = "—";
+
+    if (!ins){
+      note.innerHTML = `<span class="pill bad">Pick instrument</span> Start by typing an instrument (gold, sp, nq, crude…).`;
+      return;
+    }
+    if (!isFinite(entry) || !isFinite(stop) || !isFinite(risk) || risk<=0){
+      note.innerHTML = `<span class="pill bad">Missing</span> Enter valid numbers for Entry, Stop, and a positive $ Risk.`;
+      return;
+    }
+    const diff = Math.abs(entry - stop);
+    if (diff === 0){
+      note.innerHTML = `<span class="pill bad">Invalid</span> Entry and Stop are the same, so risk is 0.`;
+      return;
+    }
+
+    const ticksExact = diff / ins.tickSize;
+    const ticks = Math.ceil(ticksExact - 1e-12); // conservative
+    const riskPer = ticks * ins.tickValue;
+    const contracts = Math.floor(risk / riskPer);
+
+    $("riskPer").textContent = fmtMoney(riskPer);
+    $("contracts").textContent = (contracts>=0? contracts : 0).toString();
+
+    const conservative = ticks !== ticksExact;
+    const warn = contracts < 1;
+
+    const lines = [];
+    lines.push(`Δ price = ${fmtNum(diff)} → ticks ≈ ${ticksExact.toFixed(4)} (rounded up to ${ticks} tick${ticks===1?"":"s"}).`);
+    lines.push(`Risk/contract = ${ticks} × ${fmtMoney(ins.tickValue)} = <b>${fmtMoney(riskPer)}</b>.`);
+    lines.push(`Max contracts = floor(${fmtMoney(risk)} ÷ ${fmtMoney(riskPer)}) = <b>${contracts}</b>.`);
+    if (conservative) lines.push(`<span class="pill ok">Conservative</span> We rounded ticks up to be safe (stop not exactly on tick grid).`);
+    if (warn) lines.push(`<span class="pill bad">Too small</span> Your risk is below 1 contract for this stop size—tighten stop or increase risk (only if it fits your rules).`);
+
+    note.innerHTML = lines.join("<br/>");
+  }
+
+  $("calc").addEventListener("click", calc);
+  $("swap").addEventListener("click", ()=>{
+    const a=$("entry").value, b=$("stop").value;
+    $("entry").value=b; $("stop").value=a;
+    tryAutoCalc();
+  });
+  $("clear").addEventListener("click", ()=>{
+    $("entry").value=""; $("stop").value=""; $("risk").value="";
+    $("riskPer").textContent="—"; $("contracts").textContent="—";
+    $("note").textContent="";
+    $("instrument").focus();
+  });
+
+  // Auto-calc as you type
+  ["instrument","entry","stop","risk"].forEach(id=>{
+    $(id).addEventListener("input", ()=>{ updateResolved(); tryAutoCalc(); });
+    $(id).addEventListener("change", ()=>{ updateResolved(); tryAutoCalc(); });
+  });
+
+  populate();
+</script>
+</body>
+</html>
+
